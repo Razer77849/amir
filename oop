@@ -1,0 +1,121 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class Main {
+    private static final String URL = "jdbc:postgresql://localhost:5432/bank";
+    private static final String USER = "postgres";
+    private static final String PASSWORD = "01014562";
+
+    public static void main(String[] args) {
+        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD)) {
+          
+            insertCustomer(connection, "C101", "John Doe", "123 Main St");
+            insertCustomer(connection, "C102", "Jane Smith", "456 Oak Ave");
+
+          
+            insertAccount(connection, "12345", "John Doe", 1000.0, "C101");
+            insertAccount(connection, "67890", "Jane Smith", 500.0, "C102");
+
+            
+            System.out.println("--- Customers ---");
+            readCustomers(connection);
+
+            System.out.println("\n--- Accounts ---");
+            readAccounts(connection);
+
+            
+            updateCustomerAddress(connection, "C101", "789 Pine St");
+
+          
+            updateAccountBalance(connection, "12345", 1500.0);
+
+          
+            deleteAccount(connection, "67890");
+
+            
+            System.out.println("\n--- Updated Customers ---");
+            readCustomers(connection);
+
+            System.out.println("\n--- Updated Accounts ---");
+            readAccounts(connection);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void insertCustomer(Connection connection, String customerID, String name, String address) throws SQLException {
+        String sql = "INSERT INTO Customer (customerID, name, address) VALUES (?, ?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, customerID);
+            statement.setString(2, name);
+            statement.setString(3, address);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void insertAccount(Connection connection, String accountNumber, String accountHolder, double balance, String customerID) throws SQLException {
+        String sql = "INSERT INTO Account (accountNumber, accountHolder, balance, customerID) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, accountNumber);
+            statement.setString(2, accountHolder);
+            statement.setDouble(3, balance);
+            statement.setString(4, customerID);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void readCustomers(Connection connection) throws SQLException {
+        String sql = "SELECT * FROM Customer";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                System.out.println("Customer ID: " + resultSet.getString("customerID") +
+                        ", Name: " + resultSet.getString("name") +
+                        ", Address: " + resultSet.getString("address"));
+            }
+        }
+    }
+
+    private static void readAccounts(Connection connection) throws SQLException {
+        String sql = "SELECT * FROM Account";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                System.out.println("Account Number: " + resultSet.getString("accountNumber") +
+                        ", Account Holder: " + resultSet.getString("accountHolder") +
+                        ", Balance: " + resultSet.getDouble("balance") +
+                        ", Customer ID: " + resultSet.getString("customerID"));
+            }
+        }
+    }
+
+    private static void updateCustomerAddress(Connection connection, String customerID, String newAddress) throws SQLException {
+        String sql = "UPDATE Customer SET address = ? WHERE customerID = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, newAddress);
+            statement.setString(2, customerID);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void updateAccountBalance(Connection connection, String accountNumber, double newBalance) throws SQLException {
+        String sql = "UPDATE Account SET balance = ? WHERE accountNumber = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setDouble(1, newBalance);
+            statement.setString(2, accountNumber);
+            statement.executeUpdate();
+        }
+    }
+
+    private static void deleteAccount(Connection connection, String accountNumber) throws SQLException {
+        String sql = "DELETE FROM Account WHERE accountNumber = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, accountNumber);
+            statement.executeUpdate();
+        }
+    }
+}

@@ -1,121 +1,153 @@
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 
-public class Main {
-    private static final String URL = "jdbc:postgresql://localhost:5432/bank";
-    private static final String USER = "postgres";
-    private static final String PASSWORD = "01014562";
 
-    public static void main(String[] args) {
-        try (Connection connection = DriverManager.getConnection(URL, USER, PASSWORD)) {
-          
-            insertCustomer(connection, "C101", "John Doe", "123 Main St");
-            insertCustomer(connection, "C102", "Jane Smith", "456 Oak Ave");
+spring.datasource.url=jdbc:postgresql://localhost:5432/bank
+spring.datasource.username=postgres
+spring.datasource.password=01014562
+spring.datasource.driver-class-name=org.postgresql.Driver
 
-          
-            insertAccount(connection, "12345", "John Doe", 1000.0, "C101");
-            insertAccount(connection, "67890", "Jane Smith", 500.0, "C102");
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true\package com.example.demo.model;
 
-            
-            System.out.println("--- Customers ---");
-            readCustomers(connection);
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
-            System.out.println("\n--- Accounts ---");
-            readAccounts(connection);
+@Getter
+@Setter
+@Entity
+@Table(name = "account")
+public class Account {
+    @Id
+    @Column(name = "accountnumber")
+    private String accountNumber;
 
-            
-            updateCustomerAddress(connection, "C101", "789 Pine St");
+    @Column(name = "accountholder")
+    private String accountHolder;
 
-          
-            updateAccountBalance(connection, "12345", 1500.0);
+    @Column(name = "balance")
+    private double balance;
 
-          
-            deleteAccount(connection, "67890");
+    @ManyToOne
+    @JoinColumn(name = "customerid", referencedColumnName = "customerid")
+    private Customer customer;
+}
 
-            
-            System.out.println("\n--- Updated Customers ---");
-            readCustomers(connection);
+package com.example.demo.model;
 
-            System.out.println("\n--- Updated Accounts ---");
-            readAccounts(connection);
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+@Getter
+@Setter
+@Entity
+@Table(name = "customer")
+public class Customer {
+    @Id
+    @Column(name = "customerid")
+    private String customerId;
+
+    @Column(name = "name")
+    private String name;
+
+    @Column(name = "address")
+    private String address;
+}
+package com.example.demo.repository;
+
+import com.example.demo.model.Account;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+@Repository
+public interface AccountRepository extends JpaRepository<Account, String> {
+}
+package com.example.demo.repository;
+
+import com.example.demo.model.Customer;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface CustomerRepository extends JpaRepository<Customer, String> {
+}
+
+ 
+package com.example.demo.controller;
+
+import com.example.demo.model.Account;
+import com.example.demo.repository.AccountRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/accounts")
+public class AccountController {
+    private final AccountRepository accountRepository;
+
+    public AccountController(AccountRepository accountRepository) {
+        this.accountRepository = accountRepository;
     }
 
-    private static void insertCustomer(Connection connection, String customerID, String name, String address) throws SQLException {
-        String sql = "INSERT INTO Customer (customerID, name, address) VALUES (?, ?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, customerID);
-            statement.setString(2, name);
-            statement.setString(3, address);
-            statement.executeUpdate();
-        }
+    // Получить все счета
+    @GetMapping
+    public List<Account> getAllAccounts() {
+        return accountRepository.findAll();
     }
 
-    private static void insertAccount(Connection connection, String accountNumber, String accountHolder, double balance, String customerID) throws SQLException {
-        String sql = "INSERT INTO Account (accountNumber, accountHolder, balance, customerID) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, accountNumber);
-            statement.setString(2, accountHolder);
-            statement.setDouble(3, balance);
-            statement.setString(4, customerID);
-            statement.executeUpdate();
-        }
+    // Получить счет по номеру
+    @GetMapping("/{accountNumber}")
+    public ResponseEntity<Account> getAccountByNumber(@PathVariable String accountNumber) {
+        Optional<Account> account = accountRepository.findById(accountNumber);
+        return account.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private static void readCustomers(Connection connection) throws SQLException {
-        String sql = "SELECT * FROM Customer";
-        try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-            while (resultSet.next()) {
-                System.out.println("Customer ID: " + resultSet.getString("customerID") +
-                        ", Name: " + resultSet.getString("name") +
-                        ", Address: " + resultSet.getString("address"));
-            }
-        }
-    }
-
-    private static void readAccounts(Connection connection) throws SQLException {
-        String sql = "SELECT * FROM Account";
-        try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-            while (resultSet.next()) {
-                System.out.println("Account Number: " + resultSet.getString("accountNumber") +
-                        ", Account Holder: " + resultSet.getString("accountHolder") +
-                        ", Balance: " + resultSet.getDouble("balance") +
-                        ", Customer ID: " + resultSet.getString("customerID"));
-            }
-        }
-    }
-
-    private static void updateCustomerAddress(Connection connection, String customerID, String newAddress) throws SQLException {
-        String sql = "UPDATE Customer SET address = ? WHERE customerID = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, newAddress);
-            statement.setString(2, customerID);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void updateAccountBalance(Connection connection, String accountNumber, double newBalance) throws SQLException {
-        String sql = "UPDATE Account SET balance = ? WHERE accountNumber = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setDouble(1, newBalance);
-            statement.setString(2, accountNumber);
-            statement.executeUpdate();
-        }
-    }
-
-    private static void deleteAccount(Connection connection, String accountNumber) throws SQLException {
-        String sql = "DELETE FROM Account WHERE accountNumber = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, accountNumber);
-            statement.executeUpdate();
-        }
+    // Добавить новый счет
+    @PostMapping
+    public Account createAccount(@RequestBody Account account) {
+        return accountRepository.save(account);
     }
 }
+package com.example.demo.controller;
+
+import com.example.demo.model.Customer;
+import com.example.demo.repository.CustomerRepository;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/customers")
+public class CustomerController {
+    private final CustomerRepository customerRepository;
+
+    public CustomerController(CustomerRepository customerRepository) {
+        this.customerRepository = customerRepository;
+    }
+
+    // Получить всех клиентов
+    @GetMapping
+    public List<Customer> getAllCustomers() {
+        return customerRepository.findAll();
+    }
+
+    // Получить клиента по ID
+    @GetMapping("/{id}")
+    public ResponseEntity<Customer> getCustomerById(@PathVariable String id) {
+        Optional<Customer> customer = customerRepository.findById(id);
+        return customer.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    // Добавить нового клиента
+    @PostMapping
+    public Customer createCustomer(@RequestBody Customer customer) {
+        return customerRepository.save(customer);
+    }
+}
+
+
